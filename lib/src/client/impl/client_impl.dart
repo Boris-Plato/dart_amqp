@@ -115,16 +115,17 @@ class _ClientImpl implements Client {
             "Received message for channel ${serverMessage.channel} while still handshaking");
       }
 
-      // skip every even heartbeat starting from 22
-      if (heartbeatCounter <= 20 || (serverMessage is HeartbeatFrameImpl && heartbeatCounter % 2 == 0)) {
+      // skip every odd heartbeat starting from 11
+      if (heartbeatCounter <= 10 || (serverMessage is HeartbeatFrameImpl && heartbeatCounter % 2 == 0)) {
         // Reset heartbeat timer if it has been initialized.
         _heartbeatRecvTimer?.reset();
         lastMessage = serverMessage;
         lastMessageDateTime = DateTime.now();
         if (serverMessage is HeartbeatFrameImpl) {
           connectionLogger.warning("hb reset on heartbeat $heartbeatCounter at ${DateTime.now()}");
+        } else {
+          connectionLogger.warning("hb reset on message at ${DateTime.now()}");
         }
-        connectionLogger.warning("hb reset on message at ${DateTime.now()}");
       } else {
         connectionLogger.warning("hb reset SKIPPED on heartbeat $heartbeatCounter at ${DateTime.now()}");
       }
