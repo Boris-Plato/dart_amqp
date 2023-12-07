@@ -37,6 +37,7 @@ class _ClientImpl implements Client {
   /// fail, then the [_connected] [Future] returned by a call to [open[ will also fail
 
   final amqpMessageDecoder = AmqpMessageDecoder();
+  RawFrameParser? rawFrameParser;
 
   Future _reconnect() {
     _connected ??= Completer();
@@ -61,8 +62,8 @@ class _ClientImpl implements Client {
       _socket = s;
 
       // Bind processors and initiate handshake
-      RawFrameParser(tuningSettings)
-          .transformer
+      rawFrameParser = RawFrameParser(tuningSettings);
+      rawFrameParser!.transformer
           .bind(_socket!)
           .transform(amqpMessageDecoder.transformer)
           .listen(_handleMessage,
@@ -154,7 +155,7 @@ class _ClientImpl implements Client {
           _heartbeatRecvTimer = null;
           var ago = lastMessageDateTime != null ? DateTime.now().millisecondsSinceEpoch - lastMessageDateTime!.millisecondsSinceEpoch : -1;
           _handleException(HeartbeatFailedException(
-              "Server did not respond to heartbeats for ${tuningSettings.heartbeatPeriod.inSeconds}s, lastMessage was ${ago}ms ago at $lastMessageDateTime, lastMessage=$lastMessage, amqpMessageDecoder. incompleteMessages=${amqpMessageDecoder.incompleteMessages}"));
+              "Server did not respond to heartbeats for ${tuningSettings.heartbeatPeriod.inSeconds}s, lastHeartBeatSent was: ${_channels[0]?.lastHeartBeatSent.elapsedMilliseconds}ms, lastByte was: ${rawFrameParser?.lastByteReceived.elapsedMilliseconds}ms, lastMessage was ${ago}ms ago at $lastMessageDateTime, lastMessage=$lastMessage, amqpMessageDecoder. incompleteMessages=${amqpMessageDecoder.incompleteMessages}"));
         });
       }
 

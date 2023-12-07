@@ -21,6 +21,8 @@ class _ChannelImpl implements Channel {
   final _publishNotificationStream =
       StreamController<PublishNotification>.broadcast();
 
+  final Stopwatch lastHeartBeatSent = Stopwatch()..start();
+
   // After receiving a ConnectionTune message with a non-zero heartbeat value,
   // the client initializes heartbeatSendTimer to send heartbeats to the server
   // approximately twice within the agreed upon period.
@@ -70,6 +72,7 @@ class _ChannelImpl implements Channel {
       _frameWriter
         ..writeHeartbeat()
         ..pipe(_client._socket!);
+      lastHeartBeatSent.reset();
     } catch (e, st) {
       connectionLogger.warning("writeHeartbeat failed for vhost=${_client.settings.virtualHost}, host=${_client.settings.host}: $e", null, st);
       // An exception will be raised if we attempt to send a hearbeat

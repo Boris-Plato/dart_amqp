@@ -3,6 +3,7 @@ part of dart_amqp.protocol;
 class RawFrameParser {
   static const int FRAME_TERMINATOR = 0xCE;
   TuningSettings tuningSettings;
+  final Stopwatch lastByteReceived = Stopwatch()..start();
 
   final ChunkedInputReader _inputBuffer = ChunkedInputReader();
   FrameHeader? _parsedHeader;
@@ -13,6 +14,7 @@ class RawFrameParser {
 
   void handleData(List<int>? chunk, EventSink<RawFrame> sink) {
     try {
+      lastByteReceived.reset();
       // Append incoming chunk to input buffer
       if (chunk != null) {
         _inputBuffer.add(chunk);
