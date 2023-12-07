@@ -106,21 +106,29 @@ class _ClientImpl implements Client {
 
   void _handleMessage(DecodedMessage serverMessage) {
     try {
-      heartbeatCounter++;
+      // looking at logs I suppose that serverMessage with a null message field is a heartbeat
+      if (serverMessage is HeartbeatFrameImpl) {
+        heartbeatCounter++;
+      }
       // If we are still handshaking and we receive a message on another channel this is an error
       if (!_connected!.isCompleted && serverMessage.channel != 0) {
         throw FatalException(
             "Received message for channel ${serverMessage.channel} while still handshaking");
       }
 
-      if (heartbeatCounter <= 20 || heartbeatCounter % 2 == 0) {
+      // skip every odd heartbeat starting from 11
+      if (heartbeatCounter <= 10 || (serverMessage is HeartbeatFrameImpl && heartbeatCounter % 2 == 0)) {
         // Reset heartbeat timer if it has been initialized.
         _heartbeatRecvTimer?.reset();
         lastMessage = serverMessage;
         lastMessageDateTime = DateTime.now();
-        connectionLogger.warning("hb reset on message $heartbeatCounter");
+        if (serverMessage is HeartbeatFrameImpl) {
+          connectionLogger.warning("hb reset on heartbeat $heartbeatCounter at ${DateTime.now()}");
+        } else {
+          connectionLogger.warning("hb reset on message at ${DateTime.now()}");
+        }
       } else {
-        connectionLogger.warning("hb reset SKIPPED on message $heartbeatCounter");
+        connectionLogger.warning("hb reset SKIPPED on heartbeat $heartbeatCounter at ${DateTime.now()}");
       }
 
       // Heartbeat frames should be received on channel 0
