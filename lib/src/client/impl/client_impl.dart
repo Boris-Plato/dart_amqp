@@ -121,9 +121,12 @@ class _ClientImpl implements Client {
         _heartbeatRecvTimer?.reset();
         lastMessage = serverMessage;
         lastMessageDateTime = DateTime.now();
-        connectionLogger.warning("hb reset at ${DateTime.now()}");
+        if (serverMessage is HeartbeatFrameImpl) {
+          connectionLogger.warning("hb reset on heartbeat $heartbeatCounter at ${DateTime.now()}");
+        }
+        connectionLogger.warning("hb reset on message at ${DateTime.now()}");
       } else {
-        connectionLogger.warning("hb reset SKIPPED on heartbeat $heartbeatCounter");
+        connectionLogger.warning("hb reset SKIPPED on heartbeat $heartbeatCounter at ${DateTime.now()}");
       }
 
       // Heartbeat frames should be received on channel 0
