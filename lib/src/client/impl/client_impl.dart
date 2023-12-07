@@ -23,7 +23,7 @@ class _ClientImpl implements Client {
   int heartbeatCounter = 0;
   DateTime? lastMessageDateTime;
   DecodedMessage? lastMessage;
-  final Duration smallGap = const Duration(milliseconds: 100);
+  final Duration smallGap = const Duration(milliseconds: 1000);
 
   // Error Stream
   final _error = StreamController<Exception>.broadcast();
