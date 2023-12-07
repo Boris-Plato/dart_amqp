@@ -121,7 +121,7 @@ class _ClientImpl implements Client {
         _heartbeatRecvTimer?.reset();
         lastMessage = serverMessage;
         lastMessageDateTime = DateTime.now();
-        connectionLogger.warning("hb reset on heartbeat $heartbeatCounter");
+        connectionLogger.warning("hb reset at ${DateTime.now()}");
       } else {
         connectionLogger.warning("hb reset SKIPPED on heartbeat $heartbeatCounter");
       }
