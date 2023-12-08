@@ -149,13 +149,13 @@ class _ClientImpl implements Client {
         connectionLogger.warning("ConnectionOpenOk received, setting _heartbeatRecvTimer -- current state: ${_heartbeatRecvTimer?.isActive}");
         _heartbeatRecvTimer?.cancel();
         _heartbeatRecvTimer =
-            RestartableTimer(tuningSettings.heartbeatPeriod, () {
+            RestartableTimer(tuningSettings.heartbeatPeriod * 2, () {
           // Set the timer to null to avoid accidentally resetting it while
           // shutting down.
           _heartbeatRecvTimer = null;
           var ago = lastMessageDateTime != null ? DateTime.now().millisecondsSinceEpoch - lastMessageDateTime!.millisecondsSinceEpoch : -1;
           _handleException(HeartbeatFailedException(
-              "Server did not respond to heartbeats for ${tuningSettings.heartbeatPeriod.inSeconds}s, lastHeartBeatSent was: ${_channels[0]?.lastHeartBeatSent.elapsedMilliseconds}ms, lastByte was: ${rawFrameParser?.lastByteReceived.elapsedMilliseconds}ms, lastMessage was ${ago}ms ago at $lastMessageDateTime, lastMessage=$lastMessage, amqpMessageDecoder. incompleteMessages=${amqpMessageDecoder.incompleteMessages}"));
+              "Server did not respond to heartbeats for ${tuningSettings.heartbeatPeriod.inSeconds}s, lastHeartBeatSent was: ${_channels[0]?.lastHeartBeatSent.elapsedMilliseconds}ms, lastMessage was ${ago}ms ago at $lastMessageDateTime, lastMessage=$lastMessage, amqpMessageDecoder. incompleteMessages=${amqpMessageDecoder.incompleteMessages}"));
         });
       }
 
