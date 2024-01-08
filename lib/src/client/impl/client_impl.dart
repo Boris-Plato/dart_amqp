@@ -41,6 +41,9 @@ class _ClientImpl implements Client {
   /// [reconnectWaitTime] ms up to [maxConnectionAttempts] times. If all connection attempts
   /// fail, then the [_connected] [Future] returned by a call to [open[ will also fail
 
+  final amqpMessageDecoder = AmqpMessageDecoder();
+  RawFrameParser? rawFrameParser;
+
   Future _reconnect() {
     _connected ??= Completer();
 
@@ -64,10 +67,10 @@ class _ClientImpl implements Client {
       _socket = s;
 
       // Bind processors and initiate handshake
-      RawFrameParser(tuningSettings)
-          .transformer
+      rawFrameParser = RawFrameParser(tuningSettings);
+      rawFrameParser!.transformer
           .bind(_socket!)
-          .transform(AmqpMessageDecoder().transformer)
+          .transform(amqpMessageDecoder.transformer)
           .listen(_handleMessage,
               onError: _handleException,
               onDone: () =>
@@ -104,6 +107,9 @@ class _ClientImpl implements Client {
   bool get handshaking =>
       _socket != null && _connected != null && !_connected!.isCompleted;
 
+  DateTime? lastMessageDateTime;
+  DecodedMessage? lastMessage;
+
   void _handleMessage(DecodedMessage serverMessage) {
     try {
       // If we are still handshaking and we receive a message on another channel this is an error
@@ -114,6 +120,8 @@ class _ClientImpl implements Client {
 
       // Reset heartbeat timer if it has been initialized.
       _heartbeatRecvTimer?.reset();
+      lastMessage = serverMessage;
+      lastMessageDateTime = DateTime.now();
 
       // Heartbeat frames should be received on channel 0
       if (serverMessage is HeartbeatFrameImpl) {
@@ -168,7 +176,8 @@ class _ClientImpl implements Client {
       if (serverMessage.message is ConnectionClose) {
         // Ack the closing of the connection
         _channels[0]!.writeMessage(ConnectionCloseOk());
-
+        connectionLogger.warning("ConnectionClose received, canceling _heartbeatRecvTimer -- current state: ${_heartbeatRecvTimer?.isActive}");
+        _heartbeatRecvTimer?.cancel();
         ConnectionClose serverResponse =
             (serverMessage.message as ConnectionClose);
         throw ConnectionException(
