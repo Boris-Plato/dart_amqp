@@ -28,7 +28,12 @@ class _ClientImpl implements Client {
   final _error = StreamController<Exception>.broadcast();
 
   // The heartbeattRecvTimer is reset every time we receive _any_ message from
-  // the server. If the timer expires, a HeartbeatFailed exception will be raised.
+  // the server. If the timer expires, and a HeartbeatFailed exception will be
+  // raised.
+  //
+  // The timer is set to a multiple of the negotiated interval to reset the
+  // connection if we have not received any message from the server for a
+  // consecutive number of maxMissedHeartbeats (see tuningSettings).
   RestartableTimer? _heartbeatRecvTimer;
 
   _ClientImpl({ConnectionSettings? settings}) {
@@ -157,14 +162,18 @@ class _ClientImpl implements Client {
       // period has been configured, start monitoring incoming heartbeats.
       if (serverMessage.message is ConnectionOpenOk &&
           tuningSettings.heartbeatPeriod.inSeconds > 0) {
-        _heartbeatRecvTimer =
-            RestartableTimer(tuningSettings.heartbeatPeriod, () {
+        // Raise an exception if we miss maxMissedHeartbeats consecutive
+        // heartbeats.
+        Duration missInterval =
+            tuningSettings.heartbeatPeriod * tuningSettings.maxMissedHeartbeats;
+        _heartbeatRecvTimer?.cancel();
+        _heartbeatRecvTimer = RestartableTimer(missInterval, () {
           // Set the timer to null to avoid accidentally resetting it while
           // shutting down.
           _heartbeatRecvTimer = null;
           var ago = lastMessageDateTime != null ? DateTime.now().millisecondsSinceEpoch - lastMessageDateTime!.millisecondsSinceEpoch : -1;
           _handleException(HeartbeatFailedException(
-              "Server did not respond to heartbeats for ${tuningSettings.heartbeatPeriod.inSeconds}s, lastMessage was ${ago}ms ago at $lastMessageDateTime, lastMessage=$lastMessage"));
+              "Server did not respond to heartbeats for ${tuningSettings.heartbeatPeriod.inSeconds}s (missed consecutive heartbeats: ${tuningSettings.maxMissedHeartbeats})"));
         });
         connectionLogger.warning("hb reset 2 on message $heartbeatCounter");
       }
@@ -184,7 +193,7 @@ class _ClientImpl implements Client {
         ConnectionClose serverResponse =
             (serverMessage.message as ConnectionClose);
         throw ConnectionException(
-            serverResponse.replyText!,
+            serverResponse.replyText ?? "Server closed the connection",
             ErrorType.valueOf(serverResponse.replyCode),
             serverResponse.msgClassId,
             serverResponse.msgMethodId);
@@ -235,7 +244,7 @@ class _ClientImpl implements Client {
     if (handshaking) {
       _channels.clear();
       _connected!.completeError(ex);
-      close();
+      _close();
       return;
     }
 
@@ -254,7 +263,7 @@ class _ClientImpl implements Client {
             .reversed
             .forEach((_ChannelImpl channel) => channel.handleException(ex));
 
-        close();
+        _close();
         break;
       case ChannelException:
         // Forward to the appropriate channel and remove it from our list
@@ -286,6 +295,13 @@ class _ClientImpl implements Client {
   /// when the client has shut down
   @override
   Future close() {
+    return _close(closeErrorStream: true);
+  }
+
+  Future _close({bool closeErrorStream = false}) {
+    _heartbeatRecvTimer?.cancel();
+    _heartbeatRecvTimer = null;
+
     if (_socket == null) {
       return Future.value();
     }
@@ -308,7 +324,9 @@ class _ClientImpl implements Client {
       _socket!.destroy();
       _socket = null;
       _connected = null;
-      _error.close();
+      if (closeErrorStream) {
+        _error.close();
+      }
       _clientClosed!.complete();
       _clientClosed = null;
     });
